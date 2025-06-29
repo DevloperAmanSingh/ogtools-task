@@ -91,9 +91,12 @@ def extract_content_directly():
     st.markdown('<div class="stage-container">', unsafe_allow_html=True)
     st.subheader("🔍 Blog Content Extraction")
     
+    # Use test URL if selected, otherwise use default
+    default_url = st.session_state.get('selected_test_url', "https://interviewing.io/blog")
+    
     url = st.text_input(
         "Blog Website URL:",
-        value="https://interviewing.io/blog",
+        value=default_url,
         placeholder="Enter the main blog page URL...",
         help="Enter the URL of the main blog page"
     )
@@ -505,6 +508,29 @@ def main():
         
         with tab2:
             extract_pdf_content()
+        
+        # Test Suite Section
+        st.markdown("---")
+        st.markdown("## 🧪 Test Suite")
+        
+        test_urls = [
+            ("Every blog post on interviewing.io", "https://interviewing.io/blog"),
+            ("Every company guide here", "https://interviewing.io/topics#companies"),
+            ("Every interview guide here", "https://interviewing.io/learn#interview-guides"),
+            ("All of Nil's DS&A blog posts", "https://nilmamano.com/blog/category/dsa"),
+            ("Nil's Research blog", "https://nilmamano.com/blog/category/research"),
+            ("Nil's SWE blog", "https://nilmamano.com/blog/category/swe"),
+            ("Shreycation Substack", "https://shreycation.substack.com")
+        ]
+        
+        for i, (name, url) in enumerate(test_urls):
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.write(f"**{name}:** {url}")
+            with col2:
+                if st.button("Test", key=f"test_btn_{i}"):
+                    st.session_state.selected_test_url = url
+                    st.rerun()
     
     with st.sidebar:
         st.header("⚙️ Configuration")
