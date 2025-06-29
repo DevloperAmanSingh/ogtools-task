@@ -91,15 +91,25 @@ def extract_content_directly():
     st.markdown('<div class="stage-container">', unsafe_allow_html=True)
     st.subheader("🔍 Blog Content Extraction")
     
-    # Use test URL if selected, otherwise use default
-    default_url = st.session_state.get('selected_test_url', "https://interviewing.io/blog")
+    # Initialize URL in session state if not exists
+    if 'url_input' not in st.session_state:
+        st.session_state.url_input = "https://interviewing.io/blog"
+    
+    # Update URL if test button was clicked
+    if 'selected_test_url' in st.session_state:
+        st.session_state.url_input = st.session_state.selected_test_url
+        del st.session_state.selected_test_url  # Clear it after using
     
     url = st.text_input(
         "Blog Website URL:",
-        value=default_url,
+        value=st.session_state.url_input,
         placeholder="Enter the main blog page URL...",
-        help="Enter the URL of the main blog page"
+        help="Enter the URL of the main blog page",
+        key="url_text_input"
     )
+    
+    # Update session state when user types
+    st.session_state.url_input = url
     
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
@@ -138,9 +148,13 @@ def extract_content_directly():
             status_text.text("🔍 Extracting blog post URLs...")
             overall_progress.progress(0.2)
             
-            raw_items, token_usage = extract_blog_list_with_gemini(markdown, url)
-            if not raw_items:
-                st.error("❌ No blog posts found on the page")
+            try:
+                raw_items, token_usage = extract_blog_list_with_gemini(markdown, url)
+                if not raw_items:
+                    st.error("❌ No blog posts found on the page. The page might not contain a blog listing.")
+                    return
+            except Exception as gemini_error:
+                st.error(f"❌ Failed to extract blog posts: {str(gemini_error)}")
                 return
             
             # Show blog list found
@@ -267,10 +281,14 @@ def extract_pdf_content():
                 status_text.text("📄 Extracting text from PDF...")
                 overall_progress.progress(0.2)
                 
-                extracted_items, token_usage = process_pdf_file(temp_path)
-                
-                if not extracted_items:
-                    st.error("❌ No content could be extracted from the PDF")
+                try:
+                    extracted_items, token_usage = process_pdf_file(temp_path)
+                    
+                    if not extracted_items:
+                        st.error("❌ No content could be extracted from the PDF. The PDF might be empty or corrupted.")
+                        return
+                except Exception as pdf_error:
+                    st.error(f"❌ Failed to process PDF: {str(pdf_error)}")
                     return
                 
                 # Show extraction results

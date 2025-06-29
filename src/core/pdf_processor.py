@@ -210,7 +210,7 @@ def clean_and_deduplicate_chapters(chapters: List[Dict[str, Any]]) -> List[Dict[
 def extract_chapters_with_gemini(pdf_chunks: List[Dict], pdf_filename: str) -> Tuple[List[Dict[str, Any]], TokenUsage]:
     """Use Gemini to extract structured content from PDF chunks"""
     
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    api_key = "AIzaSyBDUgyC7gfnRJ4jUjYQVEeCUXp2Ewl_Ko0"
     if not api_key:
         raise ValueError("API key not set")
     
@@ -377,6 +377,21 @@ Return only valid JSON:"""
             time.sleep(0.5)
             
         except Exception as e:
+            error_msg = str(e)
+            
+            # Check for specific Gemini API errors
+            if "RESOURCE_EXHAUSTED" in error_msg:
+                raise Exception("🚫 Gemini API quota exceeded. Please try again later or check your API limits.")
+            elif "PERMISSION_DENIED" in error_msg or "API_KEY" in error_msg.upper():
+                raise Exception("🔑 Gemini API key is invalid or permissions denied. Please check your API key.")
+            elif "INVALID_ARGUMENT" in error_msg:
+                raise Exception("⚠️ Invalid request to Gemini API. The PDF content might be too long or malformed.")
+            elif "UNAVAILABLE" in error_msg or "SERVICE_UNAVAILABLE" in error_msg:
+                raise Exception("📡 Gemini API service is temporarily unavailable. Please try again later.")
+            elif "DEADLINE_EXCEEDED" in error_msg or "timeout" in error_msg.lower():
+                raise Exception("⏰ Gemini API request timed out. The PDF content might be too large to process.")
+            
+            # For non-Gemini errors, create fallback item
             chunk_content = chunk.get('content', '')
             
             fallback_title = f"Content Section (Pages {chunk.get('page_range', 'unknown')})"
@@ -433,4 +448,5 @@ def process_pdf_file(pdf_path: str) -> Tuple[List[Dict[str, Any]], TokenUsage]:
         return extracted_items, token_usage
         
     except Exception as e:
-        return [], TokenUsage(0, 0, 0, 0.0) 
+        # Re-raise the exception so UI can handle it properly
+        raise e 

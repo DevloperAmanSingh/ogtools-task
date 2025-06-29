@@ -110,7 +110,7 @@ Markdown:
 Return only JSON array:"""
 
     try:
-        api_key = os.getenv("GEMINI_API_KEY") 
+        api_key = "AIzaSyBDUgyC7gfnRJ4jUjYQVEeCUXp2Ewl_Ko0" 
         if not api_key:
             raise ValueError("API key not set")
         
@@ -178,11 +178,13 @@ Return only JSON array:"""
                 else:
                     return [], token_usage
                 
-    except Exception:
-        return [], TokenUsage(0, 0, 0, 0.0)
+    except Exception as e:
+        error_msg = str(e)
+        print(f"❌ Gemini extraction error: {error_msg}")
+        raise Exception(f"🤖 Gemini API Error: {error_msg}")
 
 def extract_blog_content_with_gemini(markdown_chunks: List[str], blog_url: str) -> Tuple[str, TokenUsage]:
-    api_key = "AIzaSyB4WPFz-gLZ-nsbavhnKPg50LOhQ_-m41Q"
+    api_key = "AIzaSyBDUgyC7gfnRJ4jUjYQVEeCUXp2Ewl_Ko0"
     if not api_key:
         raise ValueError("API key not set")
     
