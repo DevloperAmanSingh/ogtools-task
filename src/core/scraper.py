@@ -50,7 +50,6 @@ def get_markdown_from_jina(url: str) -> str:
     try:
         response = requests.get(jina_url, timeout=30)
         response.raise_for_status()
-        print(response)
         return response.text
     except requests.RequestException:
         return ""
@@ -120,7 +119,7 @@ Return only JSON array:"""
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=prompt,
-            config={"temperature": 0, "max_output_tokens": 2000}
+            config={"temperature": 0, "max_output_tokens": 8000}
         )
         
         input_tokens = len(prompt) // 4
@@ -143,17 +142,47 @@ Return only JSON array:"""
         json_match = re.search(r'\[.*\]', content, re.DOTALL)
         if json_match:
             json_str = json_match.group()
+        else:
+            json_str = content
+        
+        try:
             blog_data = json.loads(json_str)
             return blog_data, token_usage
-        else:
-            blog_data = json.loads(content)
-            return blog_data, token_usage
+        except json.JSONDecodeError as parse_error:
+            
+            repaired_json = json_str
+            
+            if not repaired_json.rstrip().endswith(']'):
+                last_complete = repaired_json.rfind('}')
+                if last_complete > 0:
+                    repaired_json = repaired_json[:last_complete + 1] + '\n]'
+                else:
+                    repaired_json = repaired_json + '"]}'
+            
+            try:
+                blog_data = json.loads(repaired_json)
+                return blog_data, token_usage
+            except json.JSONDecodeError:
+                
+                objects = re.findall(r'\{[^{}]*"title"[^{}]*\}', content, re.DOTALL)
+                blog_data = []
+                for obj_str in objects:
+                    try:
+                        obj = json.loads(obj_str)
+                        blog_data.append(obj)
+                    except:
+                        continue
+                
+                if blog_data:
+                    return blog_data, token_usage
+                else:
+                    return [], token_usage
                 
     except Exception:
         return [], TokenUsage(0, 0, 0, 0.0)
 
 def extract_blog_content_with_gemini(markdown_chunks: List[str], blog_url: str) -> Tuple[str, TokenUsage]:
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    api_key = "AIzaSyB4WPFz-gLZ-nsbavhnKPg50LOhQ_-m41Q"
     if not api_key:
         raise ValueError("API key not set")
     

@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 TEAM_ID = "aline123"
-MAX_CHUNK_SIZE = 15000  # Smaller chunks for PDFs
+MAX_CHUNK_SIZE = 15000
 CHUNK_OVERLAP = 1000
 
 PRICING = {
@@ -52,7 +52,6 @@ def extract_text_from_pdf(pdf_path: str) -> Tuple[str, List[Dict[str, Any]]]:
     page_info = []
     
     try:
-        # Use PyMuPDF for text extraction
         doc = fitz.open(pdf_path)
         
         for page_num in range(len(doc)):
@@ -73,7 +72,6 @@ def extract_text_from_pdf(pdf_path: str) -> Tuple[str, List[Dict[str, Any]]]:
         return full_text, page_info
         
     except Exception as e:
-        print(f"Error extracting PDF: {e}")
         return "", []
 
 def chunk_pdf_content(text: str, page_info: List[Dict], max_size: int = MAX_CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[Dict[str, Any]]:
@@ -91,7 +89,6 @@ def chunk_pdf_content(text: str, page_info: List[Dict], max_size: int = MAX_CHUN
     current_pages = []
     chunk_index = 1
     
-    # Split by page markers
     pages = text.split("--- Page ")
     
     for i, page_content in enumerate(pages):
@@ -100,7 +97,6 @@ def chunk_pdf_content(text: str, page_info: List[Dict], max_size: int = MAX_CHUN
             
         page_text = page_content if i == 0 else f"--- Page {page_content}"
         
-        # If adding this page would exceed max_size, finalize current chunk
         if len(current_chunk + page_text) > max_size and current_chunk:
             page_range = "unknown"
             if current_pages:
@@ -115,19 +111,15 @@ def chunk_pdf_content(text: str, page_info: List[Dict], max_size: int = MAX_CHUN
                 "chunk_index": chunk_index
             })
             
-            # Start new chunk with overlap
             overlap_text = current_chunk[-overlap:] if len(current_chunk) > overlap else current_chunk
             current_chunk = overlap_text + "\n\n" + page_text
-            # Keep last page for continuity
             current_pages = [current_pages[-1]] if current_pages else []
             chunk_index += 1
         else:
             current_chunk += "\n\n" + page_text if current_chunk else page_text
         
-        # Extract page number safely
         try:
             if "--- Page " in page_text:
-                # Extract page number from "--- Page X ---" format
                 parts = page_text.split("--- Page ")[1] if len(page_text.split("--- Page ")) > 1 else ""
                 if parts and "---" in parts:
                     page_num_str = parts.split("---")[0].strip()
@@ -136,10 +128,8 @@ def chunk_pdf_content(text: str, page_info: List[Dict], max_size: int = MAX_CHUN
                         if page_num not in current_pages:
                             current_pages.append(page_num)
         except (IndexError, ValueError, AttributeError):
-            # If page number extraction fails, continue without it
             pass
     
-    # Add final chunk
     if current_chunk:
         page_range = "unknown"
         if current_pages:
@@ -162,18 +152,14 @@ def clean_and_deduplicate_chapters(chapters: List[Dict[str, Any]]) -> List[Dict[
     if not chapters:
         return chapters
     
-    # Group similar chapters
     grouped_chapters = {}
     
     for chapter in chapters:
         title = chapter.get('title', '').strip()
         
-        # Clean title - remove generic patterns
         if title.startswith('PDF Content - Pages'):
-            # Try to extract a better title from content
-            content = chapter.get('content', '')[:500]  # First 500 chars
+            content = chapter.get('content', '')[:500]
             
-            # Look for chapter patterns in content
             chapter_patterns = [
                 r'(?:CHAPTER\s+\d+[:\.]?\s*)?([A-Z][A-Z\s]+?)(?:\n|\r|$)',
                 r'(\d+\.\s*[A-Z][A-Z\s]+?)(?:\n|\r|$)',
@@ -184,26 +170,21 @@ def clean_and_deduplicate_chapters(chapters: List[Dict[str, Any]]) -> List[Dict[
                 match = re.search(pattern, content)
                 if match:
                     extracted_title = match.group(1).strip()
-                    # Clean up the extracted title
-                    extracted_title = re.sub(r'^\d+\.\s*', '', extracted_title)  # Remove leading numbers
-                    extracted_title = extracted_title.title()  # Convert to title case
-                    if len(extracted_title) > 5:  # Must be reasonable length
+                    extracted_title = re.sub(r'^\d+\.\s*', '', extracted_title)
+                    extracted_title = extracted_title.title()
+                    if len(extracted_title) > 5:
                         title = extracted_title
                         chapter['title'] = title
                         break
         
-        # Normalize title for grouping
         normalized_title = title.lower().strip()
-        normalized_title = re.sub(r'[^\w\s]', '', normalized_title)  # Remove punctuation
-        normalized_title = re.sub(r'\s+', ' ', normalized_title)  # Normalize whitespace
+        normalized_title = re.sub(r'[^\w\s]', '', normalized_title)
+        normalized_title = re.sub(r'\s+', ' ', normalized_title)
         
-        # Group by normalized title
         if normalized_title in grouped_chapters:
-            # Merge with existing chapter
             existing = grouped_chapters[normalized_title]
             existing['content'] += '\n\n' + chapter.get('content', '')
             
-            # Update page range
             existing_range = existing.get('page_range', '')
             new_range = chapter.get('page_range', '')
             if existing_range and new_range and existing_range != new_range:
@@ -211,20 +192,16 @@ def clean_and_deduplicate_chapters(chapters: List[Dict[str, Any]]) -> List[Dict[
         else:
             grouped_chapters[normalized_title] = chapter.copy()
     
-    # Convert back to list
     deduplicated = list(grouped_chapters.values())
     
-    # Final title cleanup
     for chapter in deduplicated:
         title = chapter.get('title', '')
         
-        # Improve title formatting
         if title.isupper():
-            title = title.title()  # Convert ALL CAPS to Title Case
+            title = title.title()
             
-        # Remove redundant words
         title = re.sub(r'^(Chapter\s+\d+[:\.]?\s*)', '', title, flags=re.IGNORECASE)
-        title = re.sub(r'^\d+\.\s*', '', title)  # Remove leading numbers
+        title = re.sub(r'^\d+\.\s*', '', title)
         
         chapter['title'] = title.strip()
     
@@ -308,43 +285,34 @@ Return only valid JSON:"""
             total_token_usage.total_tokens += input_tokens + output_tokens
             total_token_usage.cost += chunk_cost
             
-            # Parse JSON response
             content = response.text.strip()
             
             content = re.sub(r'```json\s*', '', content)
             content = re.sub(r'```\s*$', '', content)
             
-            # Try different approaches to extract JSON
             parsed_data = None
             
-            # First try: direct JSON parsing
             try:
                 parsed_data = json.loads(content)
             except json.JSONDecodeError:
-                # Second try: regex extraction for JSON array or object
                 try:
-                    # Look for JSON array first
                     array_match = re.search(r'\[.*\]', content, re.DOTALL)
                     if array_match:
                         json_str = array_match.group()
                         parsed_data = json.loads(json_str)
                     else:
-                        # Fall back to single object
                         json_match = re.search(r'\{.*\}', content, re.DOTALL)
                         if json_match:
                             json_str = json_match.group()
                             parsed_data = json.loads(json_str)
                 except (json.JSONDecodeError, AttributeError):
-                    # Third try: find JSON between brackets/braces more carefully
                     try:
-                        # Try array format first
                         start_bracket = content.find('[')
                         end_bracket = content.rfind(']')
                         if start_bracket != -1 and end_bracket != -1 and end_bracket > start_bracket:
                             json_str = content[start_bracket:end_bracket+1]
                             parsed_data = json.loads(json_str)
                         else:
-                            # Try object format
                             start = content.find('{')
                             end = content.rfind('}')
                             if start != -1 and end != -1 and end > start:
@@ -353,27 +321,20 @@ Return only valid JSON:"""
                     except json.JSONDecodeError:
                         parsed_data = None
             
-            # Handle both single objects and arrays
             if parsed_data:
                 items_to_process = []
                 
                 if isinstance(parsed_data, list):
-                    # AI returned an array of items
                     items_to_process = parsed_data
                 elif isinstance(parsed_data, dict):
-                    # AI returned a single item
                     items_to_process = [parsed_data]
                 
-                # Process each item
                 for item_data in items_to_process:
                     if isinstance(item_data, dict):
-                        # Generate better fallback title if needed
                         title = item_data.get("title", "")
                         if not title or "PDF Content" in title:
-                            # Try to extract a meaningful title from content
                             content_preview = item_data.get("content", "")[:300]
                             
-                            # Look for chapter patterns
                             patterns = [
                                 r'(?:CHAPTER\s+\d+[:\.]?\s*)?([A-Z][A-Z\s]{5,50}?)(?:\n|\r|\.)',
                                 r'(\d+\.\s*[A-Z][A-Z\s]{5,50}?)(?:\n|\r)',
@@ -394,7 +355,6 @@ Return only valid JSON:"""
                             if fallback_title:
                                 item_data["title"] = fallback_title
                             else:
-                                # Last resort - use a descriptive title based on content theme
                                 keywords = re.findall(r'\b(?:interview|coding|technical|resume|career|job|algorithm|programming|software|engineer|developer|hiring|recruiter)\w*\b', content_preview.lower())
                                 if keywords:
                                     main_topic = max(set(keywords), key=keywords.count)
@@ -402,7 +362,6 @@ Return only valid JSON:"""
                                 else:
                                     item_data["title"] = f"Content Section (Pages {chunk.get('page_range', 'unknown')})"
                         
-                        # Ensure other required fields
                         item_data.setdefault("content_type", "pdf_chapter")
                         item_data.setdefault("source_url", pdf_filename)
                         item_data.setdefault("author", "Unknown")
@@ -412,24 +371,17 @@ Return only valid JSON:"""
                         
                         extracted_items.append(item_data)
             
-            # If no valid items were extracted, create fallback
             if not parsed_data or not any(isinstance(item, dict) for item in (parsed_data if isinstance(parsed_data, list) else [parsed_data])):
-                print(f"Failed to parse JSON response for chunk {chunk.get('chunk_index', 1)}")
-                print(f"Raw response: {content[:200]}...")
                 raise Exception("Could not parse AI response as JSON")
             
-            time.sleep(0.5)  # Rate limiting
+            time.sleep(0.5)
             
         except Exception as e:
-            print(f"Error processing chunk {chunk.get('chunk_index', 'unknown')}: {e}")
-            # Create fallback item with better title extraction
             chunk_content = chunk.get('content', '')
             
-            # Try to extract a meaningful title from the content
             fallback_title = f"Content Section (Pages {chunk.get('page_range', 'unknown')})"
             
             if chunk_content:
-                # Look for chapter patterns in content
                 patterns = [
                     r'(?:CHAPTER\s+\d+[:\.]?\s*)?([A-Z][A-Z\s]{5,50}?)(?:\n|\r|\.)',
                     r'(\d+\.\s*[A-Z][A-Z\s]{5,50}?)(?:\n|\r)',
@@ -457,10 +409,7 @@ Return only valid JSON:"""
             })
             continue
     
-    # Clean up and deduplicate chapters
     cleaned_items = clean_and_deduplicate_chapters(extracted_items)
-    
-    print(f"Extracted {len(extracted_items)} raw items, cleaned to {len(cleaned_items)} final chapters")
     
     return cleaned_items, total_token_usage
 
@@ -468,30 +417,20 @@ def process_pdf_file(pdf_path: str) -> Tuple[List[Dict[str, Any]], TokenUsage]:
     """Main function to process PDF file and return structured data"""
     
     try:
-        # Extract text from PDF
         full_text, page_info = extract_text_from_pdf(pdf_path)
         
         if not full_text.strip():
-            print("Warning: No text could be extracted from PDF")
             return [], TokenUsage(0, 0, 0, 0.0)
         
-        print(f"Extracted {len(full_text):,} characters from {len(page_info)} pages")
-        
-        # Chunk the content
         chunks = chunk_pdf_content(full_text, page_info)
         
         if not chunks:
-            print("Warning: No chunks created from PDF content")
             return [], TokenUsage(0, 0, 0, 0.0)
         
-        print(f"Created {len(chunks)} chunks for processing")
-        
-        # Extract structured content with Gemini
         pdf_filename = os.path.basename(pdf_path)
         extracted_items, token_usage = extract_chapters_with_gemini(chunks, pdf_filename)
         
         return extracted_items, token_usage
         
     except Exception as e:
-        print(f"Error in process_pdf_file: {e}")
         return [], TokenUsage(0, 0, 0, 0.0) 
