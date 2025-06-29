@@ -1,0 +1,8 @@
+trafilatura
+beautifulsoup4
+requests
+html2text
+PyMuPDF
+tqdm
+openai
+dotenv
